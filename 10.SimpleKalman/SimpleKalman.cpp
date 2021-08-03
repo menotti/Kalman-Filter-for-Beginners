@@ -1,115 +1,223 @@
 #include <iostream>
+#include <fstream>
+#include <stdlib.h>
+#include <stdio.h>
 #include <limits>
 #include <random>
-
 #include <CL/sycl.hpp>
 #include "oneapi/mkl.hpp"
 
-double GetVolt() {
-    std::default_random_engine generator;
-    std::normal_distribution<double> distribution(0.0, 1.0);
-    double w = 0 + 4*distribution(generator);
-    double z = 14.4 + w;
+namespace blas = oneapi::mkl::blas;
+namespace lapack = oneapi::mkl::lapack;
+using namespace std;
+
+float GetVolt() {
+    static default_random_engine generator;
+    static normal_distribution<float> distribution(0.0, 1.0);
+    float w = 0 + 4*distribution(generator);
+    float z = 14.4 + w;
     return z;
 }
 
-double SimpleKalman(double z);
+void inv(sycl::queue &queue, float *A, int64_t N);
+void eye(size_t N,float *A, float alpha);
+void display(size_t rF, size_t cS, float *matrix);
+void zero(size_t n, size_t m, float *C);
 
-int main()
-{
+int main(){
+    ofstream myfile("SimpleKalman.csv");
+    myfile << "Time,Measurements,Kalman\n";
+    auto async_handler = [](sycl::exception_list exceptions) {
+        for (exception_ptr const &e : exceptions) {
+            try {
+                rethrow_exception(e);
+            }
+            catch (sycl::exception const &e) {
+                cout << "Caught asynchronous SYCL exception: " << e.what() << endl;
+            }
+        }
+    };
     try {
+        constexpr int N = 1;
+
         auto nontransM = oneapi::mkl::transpose::nontrans;
         auto transM = oneapi::mkl::transpose::trans;
+        float alpha = 1.0; float beta = 0.0;
 
-        double alpha = 1.0;
-        double beta = 0.0;
+        sycl::device device = sycl::device(sycl::default_selector());
+        cout << "Device: " << device.get_info<sycl::info::device::name>() << "\n";
+        sycl::queue queue(device, async_handler);
+        vector<sycl::event> event_list;
 
-        sycl::queue device_queue{sycl::default_selector{}};
-
-        std::cout << "Device: "
-                  << device_queue.get_device().get_info<sycl::info::device::name>()
-                  << std::endl;
-
-        double dt = 0.2, first = 0.0, volt;
+        float dt = 0.2, first = 0.0, volt;
         int Nsamples = 51;
-        double t[Nsamples];
+        float t[Nsamples];
+
+        float *A = sycl::malloc_shared<float>(1, queue); A[0] = 1.0;
+        float *H = sycl::malloc_shared<float>(1, queue); H[0] = 1.0;
+        float *Q = sycl::malloc_shared<float>(1, queue); Q[0] = 0.0;
+        float *R = sycl::malloc_shared<float>(1, queue); R[0] = 4.0;
+        float *x = sycl::malloc_shared<float>(1, queue); x[0] = 14.0;
+        float *P = sycl::malloc_shared<float>(1, queue); P[0] = 6.0;
+        float *z = sycl::malloc_shared<float>(1, queue);      
         
-        auto Xsaved = sycl::malloc_shared<double>(Nsamples, device_queue);
-        auto Zsaved = sycl::malloc_shared<double>(Nsamples, device_queue);
-
-        auto A = sycl::malloc_shared<double>(1, device_queue); A[0] = 1.0;
-        auto H = sycl::malloc_shared<double>(1, device_queue); H[0] = 1.0;
-        auto Q = sycl::malloc_shared<double>(1, device_queue); Q[0] = 0.0;
-        auto R = sycl::malloc_shared<double>(1, device_queue); R[0] = 4.0;
-        auto x = sycl::malloc_shared<double>(1, device_queue); x[0] = 14.0;
-        auto P = sycl::malloc_shared<double>(1, device_queue); P[0] = 6.0;
-
-        auto xp = sycl::malloc_shared<double>(1, device_queue);
-        auto Pp = sycl::malloc_shared<double>(1, device_queue);
-        auto K  = sycl::malloc_shared<double>(1, device_queue);
-
-        auto AP    = sycl::malloc_shared<double>(1, device_queue);
-        auto PpHT  = sycl::malloc_shared<double>(1, device_queue);
-        auto HpHTR = sycl::malloc_shared<double>(1, device_queue);
+        float *xp = sycl::malloc_shared<float>(1, queue);
+        float *Pp = sycl::malloc_shared<float>(1, queue);
+        float *K = sycl::malloc_shared<float>(1, queue);
+        float *AP = sycl::malloc_shared<float>(1, queue);
+        float *PpHT = sycl::malloc_shared<float>(1, queue);
+        float *HpHTR = sycl::malloc_shared<float>(2, queue);
+        float *Hxp = sycl::malloc_shared<float>(1, queue);
+        float *Kz = sycl::malloc_shared<float>(1, queue);
+        float *KH = sycl::malloc_shared<float>(1, queue);
         
-        std::int64_t scratchpad_size = oneapi::mkl::lapack::getrf_scratchpad_size<double>(device_queue, 1, 1, 1);
-        double* scratchpad = sycl::malloc_shared<double>(scratchpad_size, device_queue);
-        
-        ipiv???
-
-        for (int i = 0; i < Nsamples; i++) {
-            t[i] = first += dt;
-            Zsaved[i] = GetVolt();
-            // xp = A * x
-            oneapi::mkl::blas::row_major::gemm(device_queue, nontransM, nontransM, 1, 1, 1, alpha, A, 1, x, 1, beta, xp, 1);
-            // Pp = A * P * A' + Q
-              // AP = A * P
-            oneapi::mkl::blas::row_major::gemm(device_queue, nontransM, nontransM, 1, 1, 1, alpha, A, 1, P, 1, beta, AP, 1);
-              // Pp = AP * A'
-            oneapi::mkl::blas::row_major::gemm(device_queue, nontransM, transM, 1, 1, 1, alpha, AP, 1, A, 1, beta, Pp, 1);
-              // Pp = Pp + Q
-            oneapi::mkl::blas::axpy(device_queue, 1, 1, Q, 1, Pp, 1);
-            // K = Pp * H' * inv(H * Pp * H' + R)
-              // PpHT = Pp * H'
-            oneapi::mkl::blas::row_major::gemm(device_queue, nontransM, transM, 1, 1, 1, alpha, Pp, 1, H, 1, beta, PpHT, 1);
-              // HpHTR = H * Pp * H'
-            oneapi::mkl::blas::row_major::gemm(device_queue, nontransM, nontransM, 1, 1, 1, alpha, PpHT, 1, H, 1, beta, HpHTR, 1);
-              // HpHTR = HpHTR + R
-            oneapi::mkl::blas::axpy(device_queue, 1, 1, R, 1, HpHTR, 1);
-              // HpHTR = inv(HpHTR)
-            oneapi::mkl::lapack::getrf(device_queue, 1, 1, HpHTR, 1, ipiv, scratchpad, scratchpad_size);
-            oneapi::mkl::lapack::getri(device_queue, 1, 1, HpHTR, 1, ipiv, scratchpad, scratchpad_size);
-              // K = PpHT * HpHTR
-            oneapi::mkl::blas::row_major::gemm(device_queue, nontransM, nontransM, 1, 1, 1, alpha, HpHTR, 1, PpHT, 1, beta, K, 1);
-            // x = xp + K * (z - H * xp)
-            // P = Pp - K * H * Pp
-            // volt = x
-            Xsaved[i] = volt;
-        }
-
+        auto *Xsaved = sycl::malloc_shared<float>(Nsamples, queue);
+        auto *Zsaved = sycl::malloc_shared<float>(Nsamples, queue);
         if (!Xsaved || !Zsaved) {
-            std::cerr << "Could not allocate memory for vectors." << std::endl;
+            cerr << "Could not allocate memory for vectors." << endl;
             exit(1);
         }
         
-        device_queue.wait_and_throw();
+        for (int i = 0; i < Nsamples; i++) {
+            constexpr int gemm_total = 10, axpy_total = 5;
+            sycl::event gemm_task[gemm_total], scal_task;
+            sycl::event axpy_task[axpy_total];
+            vector<sycl::event> gemm[gemm_total];
+            
+            t[i] = first;
+            first += dt;
+            Zsaved[i] = z[0] = GetVolt();
+            
+            // xp = A * x
+            gemm_task[0] = blas::gemm(queue, nontransM, nontransM, 1, 1, 1, alpha, A, 1, x, 1, beta, xp, 1, gemm[0]);
+            gemm_task[0].wait();
+            // Pp = A * P * A' + Q
+                //1.1) AP = A * P
+            gemm_task[1] = blas::gemm(queue, nontransM, nontransM, 1, 1, 1, alpha, A, 1, P, 1, beta, AP, 1,gemm[1]);
+            gemm_task[1].wait();           
+                //1.2) Pp = AP * A'
+            gemm_task[2] = blas::gemm(queue, nontransM, transM, 1, 1, 1, alpha, AP, 1, A, 1, beta, Pp, 1, gemm[2]);
+            gemm_task[2].wait();
+                //1.3)Pp = Pp + Q
+            axpy_task[0] = blas::axpy(queue, 1, alpha, Q, 1.0, Pp, 1.0);
+            axpy_task[0].wait();
+            // K = Pp * H' * inv(H * Pp * H' + R)
+                //2.1) PpHT = Pp * H' -->  dimensao PpHT: (M * N)
+            gemm_task[3] = blas::gemm(queue, nontransM, transM, 1, 1, 1, alpha, Pp, 1, H, 1, beta, PpHT, 1, gemm[3]);
+            gemm_task[3].wait();
+                //2.2) HpHTR = H * (Pp * H') = H (NxM) * PpHT(MxN) --> HpHTR (NxN)
+            gemm_task[4] = blas::gemm(queue, nontransM, nontransM, 1, 1, 1, alpha, H, 1, PpHT, 1, beta, HpHTR, 1,gemm[4]);
+            gemm_task[4].wait();
+                // 2.3) HpHTR = HpHTR + R
+            axpy_task[1] = blas::axpy(queue, 1, alpha, R, 1.0, HpHTR, 1.0);
+            axpy_task[1].wait();
+            // HpHTR = inv(HpHTR)
+            inv(queue, HpHTR, 1);
+                // 2.4) K = (Pp * H') * HpHTR ==> PpHT(MxN) * HpHTR(NxN) ---> K(MxN)
+            gemm_task[5] = blas::gemm(queue, nontransM, nontransM, 1, 1, 1, alpha, PpHT, 1, HpHTR, 1, beta, K, 1,gemm[5]);
+            gemm_task[5].wait();
+            // x = xp + K * (z - H * xp)          
+                //3.1) Hxp = H(NxM) * xp(MxN) --> Hxp(NxN)
+            gemm_task[6] = blas::gemm(queue, nontransM, nontransM, 1, 1, 1, alpha, H, 1, xp, 1, beta, Hxp, 1, gemm[6]);
+            gemm_task[6].wait();
+                //3.2) z = -Hxp(NxN) + z(NxN)
+            axpy_task[2] = blas::axpy(queue, 1, -alpha, Hxp, 1.0, z, 1.0);
+            axpy_task[2].wait();
+                //3.3) Kz = K*z --> Kz(MxN)
+            gemm_task[7] = blas::gemm(queue, nontransM, nontransM, 1, 1, 1, alpha, K, 1, z, 1, beta, Kz, 1, gemm[7]);
+            gemm_task[7].wait();
+                //3.4) xp = xp + Kz //fix-me
+            x[0] = xp[0]; 
+            axpy_task[3] = blas::axpy(queue, 1, alpha, Kz, 1.0, x, 1.0);
+            axpy_task[3].wait();
+                //3.5 x = ???
+            // P = Pp - K * H * Pp
+                //4.1) KH = K(MxN)*H(NxM) 
+            gemm_task[8] = blas::gemm(queue, nontransM, nontransM, 1, 1, 1, alpha, K, 1, H, 1, beta, KH, 1, gemm[8]);
+            gemm_task[8].wait();
+                //4.2) P = KH(MxM) * Pp(MxM)
+            gemm_task[9] = blas::gemm(queue, nontransM, nontransM, 1, 1, 1, alpha, KH, 1, Pp,1, beta, P, 1, gemm[9]);
+            gemm_task[9].wait();
+                //4.3) P = (-Pp + P)
+            axpy_task[4] = blas::axpy(queue, 1, -alpha, Pp, 1.0, P, 1.0);
+            axpy_task[4].wait();
+                //4.4) P = -P
+            scal_task = blas::scal(queue, 1, -alpha, P, 1.0);
+            scal_task.wait();
+            Xsaved[i] = x[0];
+            myfile << t[i] << ", " << Zsaved[i] << ", " << Xsaved[i] << '\n';
+        }
 
-        free(Xsaved, device_queue);
-        free(Zsaved, device_queue);
-        free(A, device_queue);
-        free(H, device_queue);
-        free(Q, device_queue);
-        free(R, device_queue);
-        free(x, device_queue);
-        free(P, device_queue);
-        free(xp, device_queue);
-        free(Pp, device_queue);
-        free(K, device_queue);
-        ...
+        free(Xsaved, queue);
+        free(Zsaved, queue);
+
+        free(A, queue);
+        free(H, queue);
+        free(Q, queue);
+        free(R, queue);
+        free(x, queue);
+        free(P, queue);
+        free(z, queue);
         
-    } catch (const std::exception &e) {
-        std::cerr << "An exception occurred: "
-                  << e.what() << std::endl;
+        free(xp, queue);
+        free(Pp, queue);
+        free(K, queue);
+        free(AP, queue);
+        free(PpHT, queue);
+        free(HpHTR, queue);
+        free(Hxp, queue);
+        free(Kz, queue);
+        free(KH, queue);
+        myfile.close();
+
+    } catch (const exception &e) {
+        cerr << "An exception occurred: "
+                  << e.what() << endl;
         exit(1);
     }
+}
+
+void display(size_t rowFirst, size_t columnSecond, float *mult){
+    cout << "Output Matrix:" << endl;
+    for(int i = 0; i < rowFirst*columnSecond; ++i){
+        if(i % columnSecond==0){
+            cout << endl << endl;
+        }
+        cout << mult[i] <<" ";
+    }
+    cout<<"\n";
+}
+
+void eye(size_t N, float *P, float alpha){
+    for (int i = 0; i < N; i++) {
+        for (int j = 0; j < N; j++) {
+            if (i == j) P[i*N+j] = 1.0*alpha;
+            else P[i*N+j] = 0.0;
+        }
+    }
+}
+
+void zero(size_t n, size_t m, float *C){
+    for (int i = 0; i < m; i++) {
+        for (int j = 0; j < n; j++) {
+            C[i*m+j] = 0.0;
+        }
+    }
+}
+
+void inv(sycl::queue &queue, float *A, int64_t N) {
+    sycl::event getr_task[2];
+    vector<sycl::event> event_list;
+
+    float scratch_size = lapack::getrf_scratchpad_size<float>(queue, N, N, N);
+    float *scratchpad = sycl::malloc_shared<float>(scratch_size+1, queue);
+
+    auto *IPIV = sycl::malloc_shared<int64_t>(N*N, queue);
+    
+    getr_task[0] = lapack::getrf(queue, N, N, A, N, IPIV, scratchpad, scratch_size, event_list);
+    getr_task[0].wait();
+    getr_task[1] = lapack::getri(queue, N, A, N, IPIV, scratchpad, scratch_size, event_list);
+    getr_task[1].wait();
+    
+    free(IPIV, queue);
 }
