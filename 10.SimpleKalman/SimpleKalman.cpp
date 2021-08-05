@@ -11,10 +11,8 @@ namespace blas = oneapi::mkl::blas;
 namespace lapack = oneapi::mkl::lapack;
 using namespace std;
 
-float GetVolt() {
-    static default_random_engine generator;
-    static normal_distribution<float> distribution(0.0, 1.0);
-    float w = 0 + 4*distribution(generator);
+float GetVolt(float rn) {
+    float w = 0 + 4*rn;
     float z = 14.4 + w;
     return z;
 }
@@ -39,6 +37,9 @@ int main(){
     };
     try {
         constexpr int N = 1;
+        default_random_engine generator;
+        generator.seed(42);
+        normal_distribution<float> distribution(0.0, 1.0);
 
         auto nontransM = oneapi::mkl::transpose::nontrans;
         auto transM = oneapi::mkl::transpose::trans;
@@ -52,7 +53,7 @@ int main(){
         float dt = 0.2, first = 0.0, volt;
         int Nsamples = 51;
         float t[Nsamples];
-
+        
         float *A = sycl::malloc_shared<float>(1, queue); A[0] = 1.0;
         float *H = sycl::malloc_shared<float>(1, queue); H[0] = 1.0;
         float *Q = sycl::malloc_shared<float>(1, queue); Q[0] = 0.0;
@@ -86,7 +87,7 @@ int main(){
             
             t[i] = first;
             first += dt;
-            Zsaved[i] = z[0] = GetVolt();
+            Zsaved[i] = z[0] = GetVolt(distribution(generator));
             
             // xp = A * x
             gemm_task[0] = blas::gemm(queue, nontransM, nontransM, 1, 1, 1, alpha, A, 1, x, 1, beta, xp, 1, gemm[0]);
