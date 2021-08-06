@@ -67,7 +67,7 @@ int main(){
         float *K = sycl::malloc_shared<float>(1, queue);
         float *AP = sycl::malloc_shared<float>(1, queue);
         float *PpHT = sycl::malloc_shared<float>(1, queue);
-        float *HpHTR = sycl::malloc_shared<float>(2, queue);
+        float *HpHTR = sycl::malloc_shared<float>(1, queue);
         float *Hxp = sycl::malloc_shared<float>(1, queue);
         float *Kz = sycl::malloc_shared<float>(1, queue);
         float *KH = sycl::malloc_shared<float>(1, queue);
@@ -175,34 +175,6 @@ int main(){
         cerr << "An exception occurred: "
                   << e.what() << endl;
         exit(1);
-    }
-}
-
-void display(size_t rowFirst, size_t columnSecond, float *mult){
-    cout << "Output Matrix:" << endl;
-    for(int i = 0; i < rowFirst*columnSecond; ++i){
-        if(i % columnSecond==0){
-            cout << endl << endl;
-        }
-        cout << mult[i] <<" ";
-    }
-    cout<<"\n";
-}
-
-void eye(size_t N, float *P, float alpha){
-    for (int i = 0; i < N; i++) {
-        for (int j = 0; j < N; j++) {
-            if (i == j) P[i*N+j] = 1.0*alpha;
-            else P[i*N+j] = 0.0;
-        }
-    }
-}
-
-void zero(size_t n, size_t m, float *C){
-    for (int i = 0; i < m; i++) {
-        for (int j = 0; j < n; j++) {
-            C[i*m+j] = 0.0;
-        }
     }
 }
 
