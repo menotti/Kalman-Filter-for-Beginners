@@ -13,13 +13,14 @@ for k = 1:NoOfImg
   plot(xm, ym, 'r*')
   plot(xh, yh, 'bs')
   
-  pause(1)
-  
   Xmsaved(:, k) = [xm ym]';
   Xhsaved(:, k) = [xh yh]';
-
+  
+  
 end
 
+csvwrite('Filtered_Img.csv',Xhsaved)
+csvwrite('Measure_Img.csv',Xmsaved)
 
 figure
 hold on
