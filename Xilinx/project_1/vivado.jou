@@ -1,0 +1,20 @@
+#-----------------------------------------------------------
+# Vivado v2021.2 (64-bit)
+# SW Build 3367213 on Tue Oct 19 02:48:09 MDT 2021
+# IP Build 3369179 on Thu Oct 21 08:25:16 MDT 2021
+# Start of session at: Mon Mar 21 10:55:50 2022
+# Process ID: 5448
+# Current directory: C:/Users/menotti/Workspace/kalman/project_1
+# Command line: vivado.exe -gui_launcher_event rodinguilauncherevent7240 C:\Users\menotti\Workspace\kalman\project_1\project_1.xpr
+# Log file: C:/Users/menotti/Workspace/kalman/project_1/vivado.log
+# Journal file: C:/Users/menotti/Workspace/kalman/project_1\vivado.jou
+# Running On: MenottiRon, OS: Windows, CPU Frequency: 2803 MHz, CPU Physical cores: 4, Host memory: 16893 MB
+#-----------------------------------------------------------
+start_gui
+open_project C:/Users/menotti/Workspace/kalman/project_1/project_1.xpr
+open_bd_design {C:/Users/menotti/Workspace/kalman/project_1/project_1.srcs/sources_1/bd/design_1/design_1.bd}
+update_compile_order -fileset sources_1
+regenerate_bd_layout
+validate_bd_design -force
+write_bd_layout -format pdf -orientation portrait C:/Users/menotti/Workspace/kalman/project_1/project_1.xpr/design_1.pdf
+write_bd_layout -format pdf -orientation landscape C:/Users/menotti/Workspace/kalman/project_1/design_1.pdf

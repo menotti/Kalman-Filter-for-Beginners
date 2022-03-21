@@ -1,0 +1,69 @@
+10:38:52 INFO  : Launching XSCT server: xsct.bat -n  -interactive C:\Users\menotti\Workspace\kalman\project_1\vitis\temp_xsdb_launch_script.tcl
+10:38:52 INFO  : Platform repository initialization has completed.
+10:38:52 INFO  : Registering command handlers for Vitis TCF services
+10:38:54 INFO  : XSCT server has started successfully.
+10:38:54 INFO  : plnx-install-location is set to ''
+10:38:54 INFO  : Successfully done setting XSCT server connection channel  
+10:38:54 INFO  : Successfully done query RDI_DATADIR 
+10:38:54 INFO  : Successfully done setting workspace for the tool. 
+10:40:36 INFO  : Result from executing command 'getProjects': design_1_wrapper
+10:40:36 INFO  : Result from executing command 'getPlatforms': 
+10:40:36 WARN  : An unexpected exception occurred in the module 'platform project logging'
+10:40:36 INFO  : Platform 'design_1_wrapper' is added to custom repositories.
+10:40:45 INFO  : Platform 'design_1_wrapper' is added to custom repositories.
+10:42:44 INFO  : Result from executing command 'getProjects': design_1_wrapper
+10:42:46 INFO  : Result from executing command 'getPlatforms': design_1_wrapper|C:/Users/menotti/Workspace/kalman/project_1/vitis/design_1_wrapper/export/design_1_wrapper/design_1_wrapper.xpfm
+10:42:46 INFO  : Checking for BSP changes to sync application flags for project 'kalman_ref'...
+10:44:48 INFO  : Result from executing command 'getProjects': design_1_wrapper
+10:44:48 INFO  : Result from executing command 'getPlatforms': design_1_wrapper|C:/Users/menotti/Workspace/kalman/project_1/vitis/design_1_wrapper/export/design_1_wrapper/design_1_wrapper.xpfm
+10:44:49 INFO  : Checking for BSP changes to sync application flags for project 'kalman_ref'...
+10:44:49 INFO  : Updating application flags with new BSP settings...
+10:44:49 INFO  : Successfully updated application flags for project kalman_ref.
+10:45:55 INFO  : Checking for BSP changes to sync application flags for project 'kalman_ref'...
+10:46:35 INFO  : Checking for BSP changes to sync application flags for project 'kalman_ref'...
+10:46:46 INFO  : Connected to target on host '127.0.0.1' and port '3121'.
+10:46:47 INFO  : Jtag cable 'Digilent Zybo Z7 210351A81B68A' is selected.
+10:46:47 INFO  : 'jtag frequency' command is executed.
+10:46:47 INFO  : Context for 'APU' is selected.
+10:46:47 INFO  : System reset is completed.
+10:46:50 INFO  : 'after 3000' command is executed.
+10:46:50 INFO  : 'targets -set -filter {jtag_cable_name =~ "Digilent Zybo Z7 210351A81B68A" && level==0 && jtag_device_ctx=="jsn-Zybo Z7-210351A81B68A-23727093-0"}' command is executed.
+10:46:53 INFO  : Device configured successfully with "C:/Users/menotti/Workspace/kalman/project_1/vitis/kalman_ref/_ide/bitstream/design_1_wrapper.bit"
+10:46:53 INFO  : Context for 'APU' is selected.
+10:46:53 INFO  : Hardware design and registers information is loaded from 'C:/Users/menotti/Workspace/kalman/project_1/vitis/design_1_wrapper/export/design_1_wrapper/hw/design_1_wrapper.xsa'.
+10:46:53 INFO  : 'configparams force-mem-access 1' command is executed.
+10:46:53 INFO  : Context for 'APU' is selected.
+10:46:53 INFO  : Sourcing of 'C:/Users/menotti/Workspace/kalman/project_1/vitis/kalman_ref/_ide/psinit/ps7_init.tcl' is done.
+10:46:54 INFO  : 'ps7_init' command is executed.
+10:46:54 INFO  : 'ps7_post_config' command is executed.
+10:46:54 INFO  : Context for processor 'ps7_cortexa9_0' is selected.
+10:46:54 INFO  : The application 'C:/Users/menotti/Workspace/kalman/project_1/vitis/kalman_ref/Debug/kalman_ref.elf' is downloaded to processor 'ps7_cortexa9_0'.
+10:46:54 INFO  : 'configparams force-mem-access 0' command is executed.
+10:46:54 INFO  : ----------------XSDB Script----------------
+connect -url tcp:127.0.0.1:3121
+targets -set -nocase -filter {name =~"APU*"}
+rst -system
+after 3000
+targets -set -filter {jtag_cable_name =~ "Digilent Zybo Z7 210351A81B68A" && level==0 && jtag_device_ctx=="jsn-Zybo Z7-210351A81B68A-23727093-0"}
+fpga -file C:/Users/menotti/Workspace/kalman/project_1/vitis/kalman_ref/_ide/bitstream/design_1_wrapper.bit
+targets -set -nocase -filter {name =~"APU*"}
+loadhw -hw C:/Users/menotti/Workspace/kalman/project_1/vitis/design_1_wrapper/export/design_1_wrapper/hw/design_1_wrapper.xsa -mem-ranges [list {0x40000000 0xbfffffff}] -regs
+configparams force-mem-access 1
+targets -set -nocase -filter {name =~"APU*"}
+source C:/Users/menotti/Workspace/kalman/project_1/vitis/kalman_ref/_ide/psinit/ps7_init.tcl
+ps7_init
+ps7_post_config
+targets -set -nocase -filter {name =~ "*A9*#0"}
+dow C:/Users/menotti/Workspace/kalman/project_1/vitis/kalman_ref/Debug/kalman_ref.elf
+configparams force-mem-access 0
+----------------End of Script----------------
+
+10:46:54 INFO  : Context for processor 'ps7_cortexa9_0' is selected.
+10:46:55 INFO  : 'con' command is executed.
+10:46:55 INFO  : ----------------XSDB Script (After Launch)----------------
+targets -set -nocase -filter {name =~ "*A9*#0"}
+con
+----------------End of Script----------------
+
+10:46:55 INFO  : Launch script is exported to file 'C:\Users\menotti\Workspace\kalman\project_1\vitis\kalman_ref_system\_ide\scripts\debugger_kalman_ref-default.tcl'
+10:50:14 INFO  : Disconnected from the channel tcfchan#3.

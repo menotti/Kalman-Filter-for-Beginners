@@ -1,0 +1,38 @@
+10:46:35 **** Incremental Build of configuration Debug for project kalman_ref ****
+make all 
+make --no-print-directory pre-build
+a9-linaro-pre-build-step
+' '
+make --no-print-directory main-build
+'Building file: ../src/Unit1.c'
+'Invoking: ARM v7 gcc compiler'
+arm-none-eabi-gcc -Wall -O0 -g3 -c -fmessage-length=0 -MT"src/Unit1.o" -mcpu=cortex-a9 -mfpu=vfpv3 -mfloat-abi=hard -IC:/Users/menotti/Workspace/kalman/project_1/vitis/design_1_wrapper/export/design_1_wrapper/sw/design_1_wrapper/standalone_ps7_cortexa9_0/bspinclude/include -MMD -MP -MF"src/Unit1.d" -MT"src/Unit1.o" -o "src/Unit1.o" "../src/Unit1.c"
+../src/Unit1.c: In function 'main':
+../src/Unit1.c:30:19: warning: unused variable 'k' [-Wunused-variable]
+   30 |         int i, j, k, cont;
+      |                   ^
+../src/Unit1.c:30:16: warning: unused variable 'j' [-Wunused-variable]
+   30 |         int i, j, k, cont;
+      |                ^
+../src/Unit1.c:25:32: warning: variable 'rot_sim' set but not used [-Wunused-but-set-variable]
+   25 |         struct matrix *q_sim, *rot_sim;
+      |                                ^~~~~~~
+../src/Unit1.c:24:50: warning: variable 'm' set but not used [-Wunused-but-set-variable]
+   24 |         struct matrix *omega_g,*omega_hat, *bg, *m;
+      |                                                  ^
+'Finished building: ../src/Unit1.c'
+' '
+'Building target: kalman_ref.elf'
+'Invoking: ARM v7 gcc linker'
+arm-none-eabi-gcc -mcpu=cortex-a9 -mfpu=vfpv3 -mfloat-abi=hard -Wl,-build-id=none -specs=Xilinx.spec -Wl,-T -Wl,../src/lscript.ld -LC:/Users/menotti/Workspace/kalman/project_1/vitis/design_1_wrapper/export/design_1_wrapper/sw/design_1_wrapper/standalone_ps7_cortexa9_0/bsplib/lib -o "kalman_ref.elf"  ./src/Unit1.o ./src/libkf.o ./src/libmat.o ./src/matrices.o ./src/platform.o   -lm -Wl,--start-group,-lxil,-lgcc,-lc,--end-group
+'Finished building target: kalman_ref.elf'
+' '
+'Invoking: ARM v7 Print Size'
+arm-none-eabi-size kalman_ref.elf  |tee "kalman_ref.elf.size"
+   text	   data	    bss	    dec	    hex	filename
+  78019	   2548	  22640	 103207	  19327	kalman_ref.elf
+'Finished building: kalman_ref.elf.size'
+' '
+
+10:46:38 Build Finished (took 2s.992ms)
+
