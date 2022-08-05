@@ -1,0 +1,3 @@
+[submodule "ParallelAlgebra"]
+	path = ParallelAlgebra
+	url = https://github.com/MBGustav/ParallelAlgebra
