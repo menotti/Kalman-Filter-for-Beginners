@@ -13,8 +13,9 @@
 #include "oneapi/mkl.hpp"
 
 
-
+#define DATA_TYPE float
 using std::setw;
+
 
 namespace blas = oneapi::mkl::blas;
 namespace lapack = oneapi::mkl::lapack;
@@ -23,40 +24,57 @@ using namespace std;
 auto nontransM = oneapi::mkl::transpose::nontrans;
 auto    transM = oneapi::mkl::transpose::trans;
 
-void inv(sycl::queue &queue, double *A, int64_t N) {
-    sycl::event getr_task[2];
+void inv(sycl::queue &queue, DATA_TYPE *A, int64_t N) {
+    
     vector<sycl::event> event_list;
 
-    double scratch_size = lapack::getrf_scratchpad_size<double>(queue, N, N, N);
-    double *scratchpad = sycl::malloc_shared<double>(scratch_size+1, queue);
+    try{
 
-    auto *IPIV = sycl::malloc_shared<int64_t>(N*N, queue);
+    std::int64_t scratch_size = lapack::getrf_scratchpad_size<DATA_TYPE>(queue, N, N, N);
+    DATA_TYPE *scratchpad = sycl::malloc_shared<DATA_TYPE>(scratch_size+3, queue);
+    std::int64_t *IPIV = sycl::malloc_shared<std::int64_t>(N, queue);
     
-    getr_task[0] = lapack::getrf(queue, N, N, A, N, IPIV, scratchpad, scratch_size, event_list);
-    getr_task[0].wait();
-    getr_task[1] = lapack::getri(queue, N, A, N, IPIV, scratchpad, scratch_size, event_list);
-    getr_task[1].wait();
-    
+    auto getrf_ev = lapack::getrf(queue, N, N, A, N, IPIV, scratchpad, scratch_size);
+    getrf_ev.wait();
+
+
+
+//  cl::sycl::event getri(cl::sycl::queue &queue, std::int64_t n, T *a, std::int64_t lda, std::int64_t *ipiv, T *scratchpad, std::int64_t scratchpad_size, const std::vector<cl::sycl::event> &events = {})
+    auto getri_ev = lapack::getri(queue, N, A, N, IPIV, scratchpad, 10);
+    getri_ev.wait_and_throw();
+
     free(IPIV, queue);
+
+    }catch(lapack::exception const &e){
+        // Handle LAPACK related exceptions happened during synchronous call
+        std::cout << "Unexpected exception caught during synchronous call to LAPACK API:\n"
+                  << "info: " << e.info() << std::endl
+                  << "detail:"<< e.detail() << std::endl; 
+        // if (e.info() > 0) {
+        // INFO is equal to the 'global' index of the element u_ii of the factor  
+        // U which is equal to zero
+            // info = e.info() + (n-2)*nb;
+        std::terminate();
+    }
 } // end Inverse function
 
 
 
-void display(double *A, int l, int c){ 
+void display(DATA_TYPE *A, int l, int c){ 
 	for(int i = 0; i< l;i++){
 		for( int j =0;j<c;j++)
 			cout << A[c*i+j] << " ";
 		cout << endl;
 	}	
-
+    cout << endl;
 }
 
 
 
-void Hjacob(double *H, double *xhat){
+void Hjacob(DATA_TYPE *H, DATA_TYPE *xhat){
 
-    double x1 = xhat[0];
-    double x3 = xhat[2]; 
+    DATA_TYPE x1 = xhat[0];
+    DATA_TYPE x3 = xhat[2]; 
     
     //dx(h)
     H[0] = x1 / sqrt(pow(x1, 2.0) + pow(x3, 2.0));
@@ -66,9 +84,9 @@ void Hjacob(double *H, double *xhat){
     
 } // end Hjacob
 
-void Hx(double *zp, double *xhat){
-    double x1 = xhat[0];
-    double x3 = xhat[2];
+void Hx(DATA_TYPE *zp, DATA_TYPE *xhat){
+    DATA_TYPE x1 = xhat[0];
+    DATA_TYPE x3 = xhat[2];
     
     zp[0] = sqrt(pow(x1, 2.0) + pow(x3, 2.0));
 }// end hx
@@ -76,78 +94,91 @@ void Hx(double *zp, double *xhat){
 class RadarEKF {
 private: 
     sycl::queue queue;
-    double alpha = 1.0; 
-    double beta = 0.0;
+    int M;
+    int L;
+    DATA_TYPE alpha = 1.0; 
+    DATA_TYPE beta = 0.0;
 
 
     //Matrix Pointers
-    double *A;
+    DATA_TYPE *A;
     
-    double *Q;
-    double *R;
-    double *x;
-    double *P;
-    double *z;
+    DATA_TYPE *Q;
+    DATA_TYPE *R;
+    DATA_TYPE *x;
+    DATA_TYPE *P;
+    DATA_TYPE *z;
 
 
     // Intermediary values to calculus
-    int M = 3;
-    int L = 1;
-    double *H     = sycl::malloc_shared<double>(M * L, queue);
-    double *xp    = sycl::malloc_shared<double>(M * L, queue); 
-    double *Pp    = sycl::malloc_shared<double>(M * M, queue);
-    double *K     = sycl::malloc_shared<double>(M * L, queue);
-    double *AP    = sycl::malloc_shared<double>(M * M, queue);   
-    double *PpHT  = sycl::malloc_shared<double>(M * L, queue); 
-    double *HpHTR = sycl::malloc_shared<double>(L * L, queue);
-    double *Hxp   = sycl::malloc_shared<double>(L * L, queue);
-    double *KH    = sycl::malloc_shared<double>(M * M, queue); 
+    DATA_TYPE *H;
+    DATA_TYPE *xp;
+    DATA_TYPE *Pp;
+    DATA_TYPE *K;
+    DATA_TYPE *AP;
+    DATA_TYPE *PpHT;
+    DATA_TYPE *HpHTR;
+    DATA_TYPE *Hxp;
+    DATA_TYPE *KH;
 
 public: 
+    RadarEKF(sycl::queue& queue, int M, int L);
     //modules
-    void update(double *);
-    double getResult( int );
+    void update(DATA_TYPE *);
+    DATA_TYPE getResult( int );
     
-    void setTransitionMatrix(double *Aset);
-    void setSttMeasure(double * Hset);
-    void setSttVariable(double * xset);
-    void setTransitionCovMatrix(double * Qset);
-    void setMeasureCovMatrix(double * Rset);
-    void setErrorCovMatrix(double * P);
+    void setTransitionMatrix(DATA_TYPE *Aset);
+    void setSttMeasure(DATA_TYPE * Hset);
+    void setSttVariable(DATA_TYPE * xset);
+    void setTransitionCovMatrix(DATA_TYPE * Qset);
+    void setMeasureCovMatrix(DATA_TYPE * Rset);
+    void setErrorCovMatrix(DATA_TYPE * P);
 
     //void ~RadarEKF()();
 };
+RadarEKF::RadarEKF(sycl::queue &queue,int M,int L): queue(queue), M(M), L(L)
+{
+    H     = sycl::malloc_shared<DATA_TYPE>(M * L, queue);
+    xp    = sycl::malloc_shared<DATA_TYPE>(M * L, queue); 
+    Pp    = sycl::malloc_shared<DATA_TYPE>(M * M, queue);
+    K     = sycl::malloc_shared<DATA_TYPE>(M * L, queue);
+    AP    = sycl::malloc_shared<DATA_TYPE>(M * M, queue);   
+    PpHT  = sycl::malloc_shared<DATA_TYPE>(M * L, queue); 
+    HpHTR = sycl::malloc_shared<DATA_TYPE>(L * L, queue);
+    Hxp   = sycl::malloc_shared<DATA_TYPE>(L * L, queue);
+    KH    = sycl::malloc_shared<DATA_TYPE>(M * M, queue); 
+}
 
-double RadarEKF::getResult(int l){
+DATA_TYPE RadarEKF::getResult(int l){
     return x[l];
 }
 
-void RadarEKF::setTransitionMatrix(double *Aset){
+void RadarEKF::setTransitionMatrix(DATA_TYPE *Aset){
     A = Aset;
 }
 
-void RadarEKF::setSttMeasure(double * Hset){
+void RadarEKF::setSttMeasure(DATA_TYPE * Hset){
     H = Hset;
 }
 
-void RadarEKF::setSttVariable(double * xset){
+void RadarEKF::setSttVariable(DATA_TYPE * xset){
     x = xset;    
 }
 
-void RadarEKF::setTransitionCovMatrix(double * Qset){
+void RadarEKF::setTransitionCovMatrix(DATA_TYPE * Qset){
     Q = Qset;
 }
 
-void RadarEKF::setMeasureCovMatrix(double * Rset){
+void RadarEKF::setMeasureCovMatrix(DATA_TYPE * Rset){
     R = Rset;
 }
 
-void RadarEKF::setErrorCovMatrix(double * Pset){
+void RadarEKF::setErrorCovMatrix(DATA_TYPE * Pset){
     P = Pset;
 }      
 
 
-void RadarEKF::update(double *z_input){
+void RadarEKF::update(DATA_TYPE *z_input){
     
     
     Hjacob(H, x);     
@@ -160,8 +191,11 @@ void RadarEKF::update(double *z_input){
     vector<sycl::event> gemm[gemm_total];
        
      // xp(MxL) = A(MxM) * x(MxL) 
-    gemm_task[0] = blas::row_major::gemm(queue, nontransM, nontransM, M, L, M, alpha, A, M, x, L, beta, xp, L, gemm[0]);
-    gemm_task[0].wait();
+    blas::row_major::gemm(queue, nontransM, nontransM,
+                          M, L, M, alpha, A, M, x, L, 
+                          beta, xp, L).wait();
+
+    // gemm_task[0].wait();
      // Pp(MxM) = A * P * A' + Q(MxM) 
         //1.1) AP(MxM) = A(MxM) * P(MxM)
     gemm_task[1] = blas::row_major::gemm(queue, nontransM, nontransM, M, M, M, alpha, A, M, P, M, beta, AP, M, gemm[1]);
@@ -192,7 +226,6 @@ void RadarEKF::update(double *z_input){
     axpy_task[1] = blas::axpy(queue, L*L, alpha, R, 1.0, HpHTR, 1.0);
     axpy_task[1].wait();
 
-    
         // HpHTR(LxL) = inv(HpHTR)
     inv(queue, HpHTR, L);                                
 
